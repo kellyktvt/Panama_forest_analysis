@@ -1,3 +1,10 @@
+"""
+Generate DreaMS embeddings from an MGF file and store them in an HDF5 file.
+
+Command:
+python generate_dreams_embeddings.py <stem>
+"""
+
 import sys
 from pathlib import Path
 from dreams.api import dreams_embeddings

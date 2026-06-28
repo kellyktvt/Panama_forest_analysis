@@ -18,7 +18,7 @@ class MyDataModule(pl.LightningDataModule):
         # Infer interest columns from filename
         filename = os.path.basename(self.data_file).replace(".pt", "")
         interest_str = filename.replace("dataset_", "").split("_rarity")[0]
-        interests = interest_str.split("_")
+        interests = [x for x in interest_str.split("_") if x != "log"]
         print(f"Interests inferred from filename: {interests}")
 
         # Extract features and targets
@@ -55,8 +55,8 @@ class MyDataModule(pl.LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=8,
-            pin_memory=True,
+            num_workers=0,
+            # pin_memory=True,
             drop_last=True,
         )
 
@@ -64,8 +64,8 @@ class MyDataModule(pl.LightningDataModule):
         return DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
-            num_workers=8,
-            pin_memory=True,
+            num_workers=0,
+            # pin_memory=True,
             drop_last=True,
         )
 

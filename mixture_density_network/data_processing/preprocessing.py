@@ -6,7 +6,7 @@ import torch
 import os
 
 
-def main(usecols, interests, rarity=None):
+def main(usecols, interests, rarity=None, log_transform=False):
     print("Load CSV")
     # Load in CSV containing data
     df_combined = pd.read_csv('data/data_panama/Panama_gnps_dreams_plot_melted_info.csv', delimiter=',', usecols=usecols)
@@ -37,6 +37,18 @@ def main(usecols, interests, rarity=None):
     val_df = df_combined[df_combined['FEATURE_ID'].isin(val_features)].reset_index(drop=True)
     test_df = df_combined[df_combined['FEATURE_ID'].isin(test_features)].reset_index(drop=True)
 
+    # Apply log transform to interest columns if requested
+    transform_params = {}
+    if log_transform:
+        print("Applying log transform to interest columns")
+        for col in interests:
+            # transform train/val/test using train-derived shift
+            train_df[col] = np.log(train_df[col].astype(float).values)
+            val_df[col] = np.log(val_df[col].astype(float).values)
+            test_df[col] = np.log(test_df[col].astype(float).values)
+            transform_params[col] = {"method": "log", "shift": 0.0}
+        print("Transform params:", transform_params)
+
     print("Save as torch tensors")
     dataset = {
         "train": {
@@ -53,14 +65,21 @@ def main(usecols, interests, rarity=None):
             "FEATURE_ID": torch.tensor(test_df['FEATURE_ID'].values, dtype=torch.long),
             "embedding": torch.tensor(np.stack(test_df['embedding'].values), dtype=torch.float),
             **{col: torch.tensor(test_df[col].values, dtype=torch.float) for col in interests}
+        },
+        "meta": {
+            "interests": interests,
+            "log_transform": bool(log_transform),
+            "transform_params": transform_params
         }
     }
     interest_str = "_".join(interests)
     if rarity is not None:
-        filename = f"data/metadata/panama/dataset_{interest_str}_rarity{rarity}.pt"
+        filename = f"data/processed_datasets/dataset_{interest_str}_rarity{rarity}.pt"
     else:
-        filename = f"data/metadata/panama/dataset_{interest_str}.pt"
-    os.makedirs('data/metadata/panama', exist_ok=True)
+        filename = f"data/processed_datasets/dataset_{interest_str}.pt"
+    if log_transform:
+        filename = filename.replace(".pt", "_log.pt")
+    os.makedirs('data/processed_datasets', exist_ok=True)
     torch.save(dataset, filename)
     print(f"Dataset saved to {filename}")
 
@@ -70,14 +89,16 @@ if __name__ == '__main__':
     parser.add_argument('-i1', '--interest1', type=str, required=True, help='Primary target variable for analysis')
     parser.add_argument('-i2', '--interest2', type=str, default=None, help='Optional secondary target variable for analysis')
     parser.add_argument('-r', '--rarity', type=int, default=None, help='Threshold for feature rarity; if None, 80/20 split is used')
+    parser.add_argument('--log_transform', action='store_true', help='Apply natural log transform to interest columns')
 
     args = parser.parse_args()
     interest1 = args.interest1
     interest2 = args.interest2
     rarity = args.rarity
+    log_transform = args.log_transform
 
     # Create list of interests for downstream use
     interests = [interest1] if interest2 is None else [interest1, interest2]
     usecols = ['FEATURE_ID', 'embedding', *interests]
 
-    main(usecols, interests, rarity)
+    main(usecols, interests, rarity, log_transform)
